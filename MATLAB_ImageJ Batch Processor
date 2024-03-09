@@ -1,0 +1,219 @@
+function results = ImageJ_BP
+%ImageJ Batch Processor for Fluorescence Intensity 
+% After running ImageJ Macro (ChannelSplit.ijm.ijm.ijm.ijm.ijm), can go through images to generate an excel file 
+
+% ImageJ Macro code for ChannelSplit (in JavaScript):
+
+%{
+JAVASCRIPT CODE STARTS HERE
+
+// Ask user to select a folder
+dir = getDirectory("Select a folder");
+// Get the list of files (& folders) in it
+fileList = getFileList(dir);
+for (i = 0; i < lengthOf(fileList); i++) {
+    print(fileList[i]);
+}
+
+// Prepare a folder to output the preliminary images
+output_prelim = dir + "output_prelim" + "/";
+File.makeDirectory(output_prelim);
+
+// Activate batch mode
+setBatchMode(true);
+
+// Loop to process the list of files
+for (i = 0; i < lengthOf(fileList); i++) {
+    // Define the "path"
+    // By concatenation of dir and the i element of the array fileList
+    current_imagePath = dir + fileList[i];
+    // Check that the currentFile is not a directory
+    if (!File.isDirectory(current_imagePath)) {
+        // Open the image
+        open(current_imagePath);
+        // Check if it's a Z-stack
+        getDimensions(width, height, channels, slices, frames);
+        if ((channels > 1) || (bitDepth() == 24)) {
+            // It's a multi-channel image, so split the channels
+            run("Split Channels");
+            ch_nbr = nImages;
+            for (c = 1; c <= ch_nbr; c++) {
+                selectImage(c);
+                currentImage_name = getTitle();
+                saveAs("tiff", output_prelim + currentImage_name);
+            }
+        } else {
+            // It's a single-channel image, save it directly
+            saveAs("tiff", output_prelim + getTitle());
+        }
+        // Close the current image to prepare for the next one
+        run("Close All");
+    }
+}
+// Deactivate batch mode
+setBatchMode(false);
+
+// Prepare a folder to output the final images
+output_dir = dir + "output" + "/";
+File.makeDirectory(output_dir);
+
+// Loop to process the list of files in output_prelim
+fileList_prelim = getFileList(output_prelim);
+for (i = 0; i < lengthOf(fileList_prelim); i++) {
+    // Define the "path" for the preliminary image
+    current_imagePath = output_prelim + fileList_prelim[i];
+    // Open the preliminary image
+    open(current_imagePath);
+    // Check if it's a Z-stack
+    getDimensions(width, height, channels, slices, frames);
+    if (slices > 1) {
+        // It's a Z-stack, so create Average Intensity Projection
+        run("Z Project...", "projection=[Average Intensity]");
+    }
+    // Save the processed image to the final output folder
+    saveAs("tiff", output_dir + getTitle());
+    // Close the current image
+    run("Close All");
+}
+
+JAVASCRIPT CODE ENDS HERE
+%}
+
+% Add JAR files to the classpath
+javaaddpath('/Applications/MATLAB_R2021b.app/java/ij.jar');
+javaaddpath('/Applications/MATLAB_R2021b.app/java/mij.jar');
+
+MIJ.start;
+
+tableData = ["Label","C=0","C=1","C=2","C=3";];
+
+% Define the path to the folder containing the images
+folderPath = '/Users/etashbhat/Documents/Dr._Song_Lab/iPSC_Cortical_Derived_Neurons/20231218_P262_staining/P301L/HMW_Tau_Test_TIF/output'; 
+
+% Get a list of all image files in the folder
+imageFiles = dir(fullfile(folderPath, '**', '*.tif'));
+disp(['Number of files: ', num2str(length(imageFiles))]);
+
+% Loop through each image file in the folder
+for i = 1:numel(imageFiles)
+    % Construct the full file path for the current image
+    imagePath = fullfile(imageFiles(i).folder, imageFiles(i).name);
+    disp(['Image path: ', imagePath]);
+
+    % Open image as ij.ImagePlus object
+    ij.IJ.open(imagePath);
+    imp = ij.WindowManager.getCurrentImage();
+
+    % Extract pixel values from the channel
+    channel = imp(:,:);
+    channelData = channel.getProcessor().getPixels();
+    channelData = reshape(channelData, channel.getWidth(), channel.getHeight())';
+
+    % Convert pixel values to double for processing, since graythresh doesn't accept ij.ImagePlus object
+    channelData = double(channelData);
+
+    % Perform grayscale thresholding
+    thresholdValue = graythresh(channelData);
+    binaryImage = imbinarize(channelData, thresholdValue);
+
+    % Display the binary image
+    figure;
+    imshow(binaryImage);
+    title('Binary Image');
+    
+    % Calculate mean intensity
+    meanValue = mean(channelData(binaryImage)); % Use the binary image as a mask
+
+    % Convert the mean value to an integer (rounding to the nearest integer)
+    meanValueInteger = round(meanValue); % THIS IS THE VALUE THAT IS IMPORTANT
+
+    disp(['Mean fluorescence intensity of the area: ', num2str(meanValueInteger)])
+
+    % GETTING THE VALUE IN THE RIGHT SPOT ON THE TABLEDATA
+
+    %{
+    filenameArray = char(imagePath);  % Convert filename to a character array
+    disp(filenameArray);  % Display the filename array
+
+    dashIndex = find(filenameArray=='-'); % represents the part of the code before image information
+    index = dashIndex + 1;
+    last_index = find(filenameArray=='.');
+
+    % Generate subarray from startIndex to the end, contanins just the filename
+    subArrayfileName = filenameArray(index: (last_index - 1));
+    fprintf(['filename: ' repmat(' %1.0f ',1,numel(subArrayfileName)) '\n'],subArrayfileName);
+    %}
+
+ 
+    filenameArray = char(imagePath);  % Convert filename to character array
+    
+    disp(filenameArray);  % Display the filename array
+    
+    dashIndex = find(filenameArray == '-'); % Find index of last hyphen
+    index = dashIndex + 1;  % Start extracting after the hyphen
+    
+    % Find index of last dot (extension delimiter)
+    last_index = find(filenameArray == '.', 1, 'last'); % Ensure last dot is found
+    
+    % Extract filename part without extension
+    subArrayfileName = filenameArray(index:last_index-1);
+    
+    fprintf(['filename: %s\n'], subArrayfileName);  % Print filename without extension
+
+    % Extract the channel number
+    channelNumber = str2double(filenameArray(dashIndex-1));
+    
+
+  %{  
+    if ismember(num2str(subArrayfileName), tableData) 
+        % Find the spot in the array
+        [row, col] = find(tableData == num2str(subArrayfileName));
+        % modify the correct position
+        tableData(row, (channelNumber + 1) ) = num2str(meanValueInteger);
+
+    else
+        A = [0, 0, 0, 0, 0];
+        tableData = [tableData ; A]; 
+        [m, n] = size(tableData);
+        tableData(m, (channelNumber + 1) ) = num2str(meanValueInteger);
+        tableData(m, 1) = num2str(subArrayfileName);
+    end
+  %}
+   
+   if ismember(subArrayfileName, tableData(:,1)) 
+        % Find the index of the matching filename in the first column
+        idx = find(strcmp(tableData(:,1), subArrayfileName));
+        % Update the corresponding row
+        tableData(idx, (channelNumber + 1) ) = num2str(meanValueInteger);
+    else
+        % Add a new row
+        newRow = {subArrayfileName, '0', '0', '0', '0'};
+        tableData = [tableData; newRow];
+        [m, ~] = size(tableData);
+        tableData(m, channelNumber + 1) = num2str(meanValueInteger);
+    end
+    
+end
+
+% Close ImageJ
+MIJ.closeAllWindows; % Closes all windows of open images 
+MIJ.exit;
+
+%% OUTPUT RESULTS
+% Construct the file name
+dateTimeStr = datestr(now, 'yyyy-mm-dd_HH-MM-SS');
+fileName = ['output_', dateTimeStr, '.xlsx'];
+
+folderPath = '/Users/etashbhat/Documents/Dr._Song_Lab/Batch_Process_Test';  % Desired folder path
+filePath = fullfile(folderPath, fileName);  % Combine folder path and file name
+
+% Convert cell array to a table
+headers = tableData(1,:);
+data = tableData(2:end,:);
+T = array2table(data, 'VariableNames', headers);
+
+% Write the table data to an Excel file
+writetable(T, filePath);
+
+results = T;
+
