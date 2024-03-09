@@ -1,0 +1,24 @@
+ImageJ Batch Processor for Fluorescence Intensity
+This repository contains MATLAB code for batch processing fluorescence intensity images using ImageJ. The code automates the process of analyzing fluorescence intensity in multiple images, making it easier to process large datasets efficiently.
+
+Features
+Batch Processing: Automatically processes multiple images in a folder.
+Channel Splitting: Splits multi-channel images into individual channels for separate analysis.
+Unique Intensity Measurements: Generates unique fluorescence intensity measurements for each channel.
+Z-Stack Processing: Handles Z-stack images by creating Average Intensity Projections.
+Data Analysis: Calculates mean fluorescence intensity and organizes results in an Excel file.
+Usage
+Image Preprocessing: Run the ImageJ macro ChannelSplit.ijm to split channels and save preliminary images.
+MATLAB Processing: Run the MATLAB script to analyze images and generate an Excel file with results.
+Output: The Excel file contains a table with filenames, channel numbers, and mean intensity values for each channel.
+Requirements
+MATLAB R2021b or later
+ImageJ installed (for preprocessing images)
+Java libraries ij.jar and mij.jar added to MATLAB classpath
+Getting Started
+Clone the repository to your local machine.
+Install MATLAB and ImageJ if not already installed.
+Add the Java libraries ij.jar and mij.jar to the MATLAB classpath.
+Follow the usage instructions above to process your fluorescence intensity images.
+License
+This project is licensed under the MIT License.
