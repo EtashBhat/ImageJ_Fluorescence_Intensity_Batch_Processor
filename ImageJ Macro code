@@ -1,0 +1,68 @@
+// Ask user to select a folder
+dir = getDirectory("Select a folder");
+// Get the list of files (& folders) in it
+fileList = getFileList(dir);
+for (i = 0; i < lengthOf(fileList); i++) {
+    print(fileList[i]);
+}
+
+// Prepare a folder to output the preliminary images
+output_prelim = dir + "output_prelim" + "/";
+File.makeDirectory(output_prelim);
+
+// Activate batch mode
+setBatchMode(true);
+
+// Loop to process the list of files
+for (i = 0; i < lengthOf(fileList); i++) {
+    // Define the "path"
+    // By concatenation of dir and the i element of the array fileList
+    current_imagePath = dir + fileList[i];
+    // Check that the currentFile is not a directory
+    if (!File.isDirectory(current_imagePath)) {
+        // Open the image
+        open(current_imagePath);
+        // Check if it's a Z-stack
+        getDimensions(width, height, channels, slices, frames);
+        if ((channels > 1) || (bitDepth() == 24)) {
+            // It's a multi-channel image, so split the channels
+            run("Split Channels");
+            ch_nbr = nImages;
+            for (c = 1; c <= ch_nbr; c++) {
+                selectImage(c);
+                currentImage_name = getTitle();
+                saveAs("tiff", output_prelim + currentImage_name);
+            }
+        } else {
+            // It's a single-channel image, save it directly
+            saveAs("tiff", output_prelim + getTitle());
+        }
+        // Close the current image to prepare for the next one
+        run("Close All");
+    }
+}
+// Deactivate batch mode
+setBatchMode(false);
+
+// Prepare a folder to output the final images
+output_dir = dir + "output" + "/";
+File.makeDirectory(output_dir);
+
+// Loop to process the list of files in output_prelim
+fileList_prelim = getFileList(output_prelim);
+for (i = 0; i < lengthOf(fileList_prelim); i++) {
+    // Define the "path" for the preliminary image
+    current_imagePath = output_prelim + fileList_prelim[i];
+    // Open the preliminary image
+    open(current_imagePath);
+    // Check if it's a Z-stack
+    getDimensions(width, height, channels, slices, frames);
+    if (slices > 1) {
+        // It's a Z-stack, so create Average Intensity Projection
+        run("Z Project...", "projection=[Average Intensity]");
+    }
+    // Save the processed image to the final output folder
+    saveAs("tiff", output_dir + getTitle());
+    // Close the current image
+    run("Close All");
+}
